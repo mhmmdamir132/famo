@@ -164,3 +164,86 @@ contract FamoSynapseAlley {
     error FM_PersonaZero();
     error FM_MoodZero();
     error FM_IntentZero();
+    error FM_AlreadyRegistered(uint64 laneId, address fren);
+    error FM_NotRegistered(uint64 laneId, address fren);
+    error FM_PulseTooLong(uint256 len, uint256 maxLen);
+    error FM_TipTooSmall(uint256 sent, uint256 minWei);
+    error FM_CapsuleFeeShort(uint256 sent, uint256 required);
+    error FM_CapsuleReplay(bytes32 adviceHash);
+    error FM_CapsuleBadSig(address expected, address recovered);
+    error FM_CapsuleUnknown(uint256 capsuleId);
+    error FM_CapsuleRevoked(uint256 capsuleId);
+    error FM_GuildUnknown(uint32 guildId);
+    error FM_GuildInactive(uint32 guildId);
+    error FM_GuildFull(uint32 guildId, uint32 cap);
+    error FM_AlreadyInGuild(uint32 guildId, address member);
+    error FM_NotInGuild(uint32 guildId, address member);
+    error FM_GuildCrestZero();
+    error FM_BadgeAlreadyClaimed(uint8 badgeId);
+    error FM_BadgeLocked(uint8 badgeId, uint32 required);
+    error FM_BadgeIdOutOfRange(uint8 badgeId, uint8 maxId);
+    error FM_BatchTooLarge(uint256 n, uint256 maxN);
+    error FM_WithdrawZero();
+    error FM_InsufficientTipPool(uint256 requested, uint256 available);
+    error FM_TransferFailed();
+    error FM_WindowInvalid(uint64 windowSec);
+    error FM_Reentrant();
+
+    event Opened(uint64 indexed laneId, bytes32 themeHash, uint64 openedAt, uint64 closesAt);
+    event Extended(uint64 indexed laneId, uint64 newClosesAt);
+    event Sealed(uint64 indexed laneId, uint32 pulseCount, uint32 frenCount);
+    event Registered(uint64 indexed laneId, address indexed fren, bytes32 avatarHash, bytes32 personaTag);
+    event AuraUpdated(uint64 indexed laneId, address indexed fren, bytes32 auraBlend);
+    event Pulled(uint64 indexed laneId, address indexed fren, bytes32 moodHash, bytes32 intentHash, uint32 streak);
+    event TipReceived(uint64 indexed laneId, address indexed from, uint256 amountWei, uint256 lanePool);
+    event CapsuleStored(uint256 indexed capsuleId, uint64 indexed laneId, address indexed author, bytes32 adviceHash);
+    event CapsuleRevoked(uint256 indexed capsuleId, address indexed warden);
+    event Claimed(uint64 indexed laneId, address indexed fren, uint8 badgeId);
+    event GuildForged(uint32 indexed guildId, address indexed founder, bytes32 crestHash);
+    event GuildJoined(uint32 indexed guildId, address indexed member);
+    event GuildLeft(uint32 indexed guildId, address indexed member);
+    event GuildDissolved(uint32 indexed guildId);
+    event WardenMoved(address indexed previous, address indexed next);
+    event LanePauseSet(bool paused);
+    event TipsWithdrawn(address indexed warden, uint256 amountWei);
+    event Genesis(uint64 indexed genesisNonce, address indexed warden, uint256 chainId, uint64 buildTag);
+
+    constructor() {
+        ADDRESS_A = 0x3d4B78178c10C06f5B3A9D67F5e9926F16A5d6B9;
+        ADDRESS_B = 0x24Df26B74C605bee0b3cD22C39e723654F74Ab10;
+        ADDRESS_C = 0xd8292D368deAa6a65C998B604A287c8eD562E585;
+
+        deployChainId = uint64(block.chainid);
+        warden = msg.sender;
+        genesisNonce = uint64(uint256(keccak256(abi.encodePacked(deployChainId, msg.sender, block.prevrandao, FM_SEED))) >> 192);
+
+        emit Genesis(genesisNonce, msg.sender, block.chainid, FM_BUILD_TAG);
+    }
+
+    modifier onlyWarden() {
+        if (msg.sender != warden) revert FM_NotWarden(msg.sender);
+        _;
+    }
+
+    modifier whenLanesLive() {
+        if (lanePaused) revert FM_LanePaused();
+        _;
+    }
+
+    function transferWarden(address next) external onlyWarden {
+        address prev = warden;
+        warden = next;
+        emit WardenMoved(prev, next);
+    }
+
+    function setLanePaused(bool paused) external onlyWarden {
+        lanePaused = paused;
+        emit LanePauseSet(paused);
+    }
+
+    function openLane(uint64 laneId, bytes32 themeHash, uint64 windowSec) external onlyWarden whenLanesLive {
+        if (laneId > MAX_LANE_ID) revert FM_LaneIdOutOfRange(laneId);
+        if (themeHash == bytes32(0)) revert FM_ThemeZero();
+        if (windowSec == 0 || windowSec > 604_800) revert FM_WindowInvalid(windowSec);
+
+        Lane storage lane = _lanes[laneId];
