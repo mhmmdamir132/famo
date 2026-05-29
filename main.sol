@@ -413,3 +413,86 @@ contract FamoSynapseAlley {
         });
 
         lane.tipPool += msg.value;
+
+        emit CapsuleStored(capsuleSeq, laneId, msg.sender, adviceHash);
+    }
+
+    function revokeCapsule(uint256 capsuleId) external onlyWarden {
+        Capsule storage cap = _capsules[capsuleId];
+        if (cap.storedAt == 0) revert FM_CapsuleUnknown(capsuleId);
+        if (cap.revoked) revert FM_CapsuleRevoked(capsuleId);
+        cap.revoked = true;
+        emit CapsuleRevoked(capsuleId, msg.sender);
+    }
+
+    function forgeGuild(uint32 guildId, bytes32 crestHash) external whenLanesLive returns (uint32) {
+        if (crestHash == bytes32(0)) revert FM_GuildCrestZero();
+
+        Guild storage g = _guilds[guildId];
+        if (g.forgedAt != 0 && g.active) revert FM_GuildUnknown(guildId);
+
+        g.crestHash = crestHash;
+        g.founder = msg.sender;
+        g.active = true;
+        g.memberCount = 1;
+        g.forgedAt = uint64(block.timestamp);
+
+        _guildMember[guildId][msg.sender] = true;
+        _guildRoster[guildId].push(msg.sender);
+        _guildsOf[msg.sender].push(guildId);
+
+        emit GuildForged(guildId, msg.sender, crestHash);
+        emit GuildJoined(guildId, msg.sender);
+        return guildId;
+    }
+
+    function joinGuild(uint32 guildId) external whenLanesLive {
+        Guild storage g = _guilds[guildId];
+        if (g.forgedAt == 0) revert FM_GuildUnknown(guildId);
+        if (!g.active) revert FM_GuildInactive(guildId);
+        if (g.memberCount >= MAX_GUILD_MEMBERS) revert FM_GuildFull(guildId, MAX_GUILD_MEMBERS);
+        if (_guildMember[guildId][msg.sender]) revert FM_AlreadyInGuild(guildId, msg.sender);
+
+        _guildMember[guildId][msg.sender] = true;
+        _guildRoster[guildId].push(msg.sender);
+        _guildsOf[msg.sender].push(guildId);
+
+        unchecked {
+            g.memberCount += 1;
+        }
+
+        emit GuildJoined(guildId, msg.sender);
+    }
+
+    function leaveGuild(uint32 guildId) external {
+        Guild storage g = _guilds[guildId];
+        if (g.forgedAt == 0) revert FM_GuildUnknown(guildId);
+        if (!_guildMember[guildId][msg.sender]) revert FM_NotInGuild(guildId, msg.sender);
+
+        _guildMember[guildId][msg.sender] = false;
+        _removeFromRoster(guildId, msg.sender);
+        _removeFromMemberGuilds(msg.sender, guildId);
+
+        unchecked {
+            if (g.memberCount > 0) {
+                g.memberCount -= 1;
+            }
+        }
+
+        if (g.memberCount == 0) {
+            g.active = false;
+            emit GuildDissolved(guildId);
+        }
+
+        emit GuildLeft(guildId, msg.sender);
+    }
+
+    function claimBadge(uint64 laneId, uint8 badgeId) external whenLanesLive {
+        if (badgeId > MAX_BADGE_ID) revert FM_BadgeIdOutOfRange(badgeId, MAX_BADGE_ID);
+        if (!_registered[laneId][msg.sender]) revert FM_NotRegistered(laneId, msg.sender);
+
+        FrenCard storage card = _cards[laneId][msg.sender];
+        uint32 bit = uint32(1) << badgeId;
+        if (card.badgeMask & bit != 0) revert FM_BadgeAlreadyClaimed(badgeId);
+
+        uint32 required = _badgeThreshold(badgeId);
