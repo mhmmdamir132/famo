@@ -911,3 +911,86 @@ contract FamoSynapseAlley {
         replies = new bytes32[](frens.length);
         for (uint256 i = 0; i < frens.length; ++i) {
             if (_registered[laneId][frens[i]]) {
+                replies[i] = _lastPulse[laneId][frens[i]].replyTo;
+            }
+        }
+    }
+
+    function batchIntentHashes(uint64 laneId, address[] calldata frens) external view returns (bytes32[] memory intents) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        intents = new bytes32[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            if (_registered[laneId][frens[i]]) {
+                intents[i] = _lastPulse[laneId][frens[i]].intentHash;
+            }
+        }
+    }
+
+    function batchMoodHashes(uint64 laneId, address[] calldata frens) external view returns (bytes32[] memory moods) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        moods = new bytes32[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            if (_registered[laneId][frens[i]]) {
+                moods[i] = _lastPulse[laneId][frens[i]].moodHash;
+            }
+        }
+    }
+
+    function batchCapsuleStoredTimes(uint256[] calldata capsuleIds) external view returns (uint64[] memory times) {
+        if (capsuleIds.length > MAX_BATCH) revert FM_BatchTooLarge(capsuleIds.length, MAX_BATCH);
+        times = new uint64[](capsuleIds.length);
+        for (uint256 i = 0; i < capsuleIds.length; ++i) {
+            times[i] = _capsules[capsuleIds[i]].storedAt;
+        }
+    }
+
+    function batchLaneExistsFlags(uint64[] calldata laneIds) external view returns (bool[] memory flags) {
+        if (laneIds.length > MAX_BATCH) revert FM_BatchTooLarge(laneIds.length, MAX_BATCH);
+        flags = new bool[](laneIds.length);
+        for (uint256 i = 0; i < laneIds.length; ++i) {
+            flags[i] = _lanes[laneIds[i]].openedAt != 0;
+        }
+    }
+
+    function batchRegisteredAtTimes(uint64 laneId, address[] calldata frens) external view returns (uint64[] memory times) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        times = new uint64[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            if (_registered[laneId][frens[i]]) {
+                times[i] = _cards[laneId][frens[i]].registeredAt;
+            }
+        }
+    }
+
+    function batchGuildForgedTimes(uint32[] calldata guildIds) external view returns (uint64[] memory times) {
+        if (guildIds.length > MAX_BATCH) revert FM_BatchTooLarge(guildIds.length, MAX_BATCH);
+        times = new uint64[](guildIds.length);
+        for (uint256 i = 0; i < guildIds.length; ++i) {
+            times[i] = _guilds[guildIds[i]].forgedAt;
+        }
+    }
+
+    function batchCapsuleNonces(uint64 laneId, address[] calldata authors) external view returns (uint64[] memory nonces) {
+        if (authors.length > MAX_BATCH) revert FM_BatchTooLarge(authors.length, MAX_BATCH);
+        nonces = new uint64[](authors.length);
+        for (uint256 i = 0; i < authors.length; ++i) {
+            nonces[i] = _capsuleNonce[laneId][authors[i]];
+        }
+    }
+
+    function domainSeparator() external view returns (bytes32) {
+        return _domainSeparator();
+    }
+
+    function _domainSeparator() private view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                FM_EIP712_DOMAIN_TYPEHASH,
+                FM_DOMAIN_NAME_HASH,
+                FM_DOMAIN_VERSION_HASH,
+                block.chainid,
+                address(this)
+            )
+        );
+    }
+
