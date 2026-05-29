@@ -579,3 +579,86 @@ contract FamoSynapseAlley {
         return (
             card.avatarHash,
             card.personaTag,
+            card.auraBlend,
+            card.active,
+            card.registeredAt,
+            card.pulseTotal,
+            card.badgeMask
+        );
+    }
+
+    function lastPulseOf(uint64 laneId, address fren)
+        external
+        view
+        returns (bytes32 moodHash, bytes32 intentHash, bytes32 replyTo, uint64 emittedAt, uint32 streakAfter)
+    {
+        if (!_registered[laneId][fren]) revert FM_NotRegistered(laneId, fren);
+        PulseRecord memory p = _lastPulse[laneId][fren];
+        return (p.moodHash, p.intentHash, p.replyTo, p.emittedAt, p.streakAfter);
+    }
+
+    function streakOf(uint64 laneId, address fren) external view returns (uint32) {
+        return _streak[laneId][fren];
+    }
+
+    function capsuleById(uint256 capsuleId)
+        external
+        view
+        returns (bytes32 adviceHash, bytes32 moodHash, address author, uint64 laneId, uint64 storedAt, bool revoked)
+    {
+        Capsule memory cap = _capsules[capsuleId];
+        if (cap.storedAt == 0) revert FM_CapsuleUnknown(capsuleId);
+        return (cap.adviceHash, cap.moodHash, cap.author, cap.laneId, cap.storedAt, cap.revoked);
+    }
+
+    function guildMeta(uint32 guildId)
+        external
+        view
+        returns (bytes32 crestHash, address founder, bool active, uint32 memberCount, uint64 forgedAt)
+    {
+        Guild memory g = _guilds[guildId];
+        if (g.forgedAt == 0) revert FM_GuildUnknown(guildId);
+        return (g.crestHash, g.founder, g.active, g.memberCount, g.forgedAt);
+    }
+
+    function guildRoster(uint32 guildId) external view returns (address[] memory) {
+        if (_guilds[guildId].forgedAt == 0) revert FM_GuildUnknown(guildId);
+        return _guildRoster[guildId];
+    }
+
+    function guildsFor(address member) external view returns (uint32[] memory) {
+        return _guildsOf[member];
+    }
+
+    function laneOpenNow(uint64 laneId) external view returns (bool) {
+        Lane memory lane = _lanes[laneId];
+        if (lane.openedAt == 0) return false;
+        if (lane.sealed || !lane.open) return false;
+        return block.timestamp <= lane.closesAt;
+    }
+
+    function frenLaneProof(uint64 laneId, address fren) external view returns (bytes32) {
+        if (!_registered[laneId][fren]) revert FM_NotRegistered(laneId, fren);
+
+        FrenCard memory card = _cards[laneId][fren];
+        PulseRecord memory pulse = _lastPulse[laneId][fren];
+        Lane memory lane = _lanes[laneId];
+
+        bytes32 hA = keccak256(
+            abi.encode(FM_DOMAIN_SALT, FM_SEED, laneId, fren, card.avatarHash, card.personaTag, card.pulseTotal)
+        );
+        bytes32 hB = keccak256(
+            abi.encode(
+                card.auraBlend,
+                pulse.moodHash,
+                pulse.intentHash,
+                _streak[laneId][fren],
+                lane.themeHash,
+                genesisNonce,
+                warden
+            )
+        );
+
+        return keccak256(abi.encodePacked(hA, hB, FM_BUILD_TAG, FM_BUILD_STAMP, ADDRESS_A, ADDRESS_B, ADDRESS_C));
+    }
+
