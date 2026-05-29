@@ -247,3 +247,86 @@ contract FamoSynapseAlley {
         if (windowSec == 0 || windowSec > 604_800) revert FM_WindowInvalid(windowSec);
 
         Lane storage lane = _lanes[laneId];
+        if (lane.openedAt != 0 && !lane.sealed) revert FM_LaneAlreadyOpen(laneId);
+
+        uint64 openedAt = uint64(block.timestamp);
+        lane.themeHash = themeHash;
+        lane.curatorNote = bytes32(0);
+        lane.open = true;
+        lane.sealed = false;
+        lane.openedAt = openedAt;
+        lane.closesAt = openedAt + windowSec;
+        lane.pulseCount = 0;
+        lane.frenCount = 0;
+
+        if (laneId > lastLaneId) {
+            lastLaneId = laneId;
+        }
+
+        emit Opened(laneId, themeHash, openedAt, lane.closesAt);
+    }
+
+    function setCuratorNote(uint64 laneId, bytes32 noteHash) external onlyWarden {
+        Lane storage lane = _lanes[laneId];
+        if (lane.openedAt == 0) revert FM_LaneUnknown(laneId);
+        lane.curatorNote = noteHash;
+    }
+
+    function extendLane(uint64 laneId, uint64 extraSec) external onlyWarden {
+        if (extraSec == 0 || extraSec > 172_800) revert FM_WindowInvalid(extraSec);
+        Lane storage lane = _lanes[laneId];
+        if (lane.openedAt == 0) revert FM_LaneUnknown(laneId);
+        if (lane.sealed) revert FM_LaneSealed(laneId);
+
+        lane.closesAt += extraSec;
+        emit Extended(laneId, lane.closesAt);
+    }
+
+    function sealLane(uint64 laneId) external onlyWarden {
+        Lane storage lane = _lanes[laneId];
+        if (lane.openedAt == 0) revert FM_LaneUnknown(laneId);
+        if (lane.sealed) revert FM_LaneSealed(laneId);
+
+        lane.open = false;
+        lane.sealed = true;
+
+        emit Sealed(laneId, lane.pulseCount, lane.frenCount);
+    }
+
+    function registerFren(uint64 laneId, bytes32 avatarHash, bytes32 personaTag) external whenLanesLive {
+        if (avatarHash == bytes32(0)) revert FM_AvatarZero();
+        if (personaTag == bytes32(0)) revert FM_PersonaZero();
+
+        Lane storage lane = _lanes[laneId];
+        if (lane.openedAt == 0) revert FM_LaneUnknown(laneId);
+        if (!lane.open || lane.sealed) revert FM_LaneClosed(laneId);
+        if (block.timestamp > lane.closesAt) revert FM_LaneClosed(laneId);
+        if (_registered[laneId][msg.sender]) revert FM_AlreadyRegistered(laneId, msg.sender);
+
+        _registered[laneId][msg.sender] = true;
+        _cards[laneId][msg.sender] = FrenCard({
+            avatarHash: avatarHash,
+            personaTag: personaTag,
+            auraBlend: keccak256(abi.encode(FM_SEED, avatarHash, personaTag)),
+            active: true,
+            registeredAt: uint64(block.timestamp),
+            pulseTotal: 0,
+            badgeMask: 0
+        });
+
+        unchecked {
+            lane.frenCount += 1;
+        }
+
+        emit Registered(laneId, msg.sender, avatarHash, personaTag);
+    }
+
+    function refreshAura(uint64 laneId, bytes32 pulseHint) external whenLanesLive {
+        if (!_registered[laneId][msg.sender]) revert FM_NotRegistered(laneId, msg.sender);
+
+        FrenCard storage card = _cards[laneId][msg.sender];
+        uint32 streak = _streak[laneId][msg.sender];
+        card.auraBlend = FamoLaneMath.blendAura(card.auraBlend, pulseHint, streak);
+
+        emit AuraUpdated(laneId, msg.sender, card.auraBlend);
+    }
