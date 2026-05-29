@@ -496,3 +496,86 @@ contract FamoSynapseAlley {
         if (card.badgeMask & bit != 0) revert FM_BadgeAlreadyClaimed(badgeId);
 
         uint32 required = _badgeThreshold(badgeId);
+        if (card.pulseTotal < required) revert FM_BadgeLocked(badgeId, required);
+
+        card.badgeMask |= bit;
+        emit Claimed(laneId, msg.sender, badgeId);
+    }
+
+    function tipLane(uint64 laneId) external payable whenLanesLive {
+        if (msg.value < MIN_TIP_WEI) revert FM_TipTooSmall(msg.value, MIN_TIP_WEI);
+
+        Lane storage lane = _lanes[laneId];
+        if (lane.openedAt == 0) revert FM_LaneUnknown(laneId);
+
+        lane.tipPool += msg.value;
+        globalTipWei += msg.value;
+
+        emit TipReceived(laneId, msg.sender, msg.value, lane.tipPool);
+    }
+
+    function withdrawLaneTips(uint64 laneId, uint256 amountWei) external onlyWarden {
+        if (_withdrawLock != 1) revert FM_Reentrant();
+        _withdrawLock = 2;
+
+        if (amountWei == 0) revert FM_WithdrawZero();
+
+        Lane storage lane = _lanes[laneId];
+        if (lane.openedAt == 0) revert FM_LaneUnknown(laneId);
+        if (amountWei > lane.tipPool) revert FM_InsufficientTipPool(amountWei, lane.tipPool);
+
+        lane.tipPool -= amountWei;
+        _sendWei(payable(msg.sender), amountWei);
+
+        emit TipsWithdrawn(msg.sender, amountWei);
+        _withdrawLock = 1;
+    }
+
+    function laneMeta(uint64 laneId)
+        external
+        view
+        returns (
+            bytes32 themeHash,
+            bytes32 curatorNote,
+            bool open,
+            bool sealed,
+            uint64 openedAt,
+            uint64 closesAt,
+            uint32 pulseCount,
+            uint32 frenCount,
+            uint256 tipPool
+        )
+    {
+        Lane memory lane = _lanes[laneId];
+        if (lane.openedAt == 0) revert FM_LaneUnknown(laneId);
+        return (
+            lane.themeHash,
+            lane.curatorNote,
+            lane.open,
+            lane.sealed,
+            lane.openedAt,
+            lane.closesAt,
+            lane.pulseCount,
+            lane.frenCount,
+            lane.tipPool
+        );
+    }
+
+    function frenCard(uint64 laneId, address fren)
+        external
+        view
+        returns (
+            bytes32 avatarHash,
+            bytes32 personaTag,
+            bytes32 auraBlend,
+            bool active,
+            uint64 registeredAt,
+            uint32 pulseTotal,
+            uint32 badgeMask
+        )
+    {
+        if (!_registered[laneId][fren]) revert FM_NotRegistered(laneId, fren);
+        FrenCard memory card = _cards[laneId][fren];
+        return (
+            card.avatarHash,
+            card.personaTag,
