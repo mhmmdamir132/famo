@@ -330,3 +330,86 @@ contract FamoSynapseAlley {
 
         emit AuraUpdated(laneId, msg.sender, card.auraBlend);
     }
+
+    function emitPulse(uint64 laneId, bytes32 moodHash, bytes32 intentHash, bytes32 replyTo) external whenLanesLive {
+        _emitPulse(laneId, moodHash, intentHash, replyTo, 0);
+    }
+
+    function emitPulseWithTip(uint64 laneId, bytes32 moodHash, bytes32 intentHash, bytes32 replyTo) external payable whenLanesLive {
+        if (msg.value < MIN_TIP_WEI) revert FM_TipTooSmall(msg.value, MIN_TIP_WEI);
+        _emitPulse(laneId, moodHash, intentHash, replyTo, msg.value);
+    }
+
+    function _emitPulse(uint64 laneId, bytes32 moodHash, bytes32 intentHash, bytes32 replyTo, uint256 tipWei) private {
+        if (moodHash == bytes32(0)) revert FM_MoodZero();
+        if (intentHash == bytes32(0)) revert FM_IntentZero();
+        if (!_registered[laneId][msg.sender]) revert FM_NotRegistered(laneId, msg.sender);
+
+        Lane storage lane = _lanes[laneId];
+        if (lane.openedAt == 0) revert FM_LaneUnknown(laneId);
+        if (!lane.open || lane.sealed) revert FM_LaneClosed(laneId);
+        if (block.timestamp > lane.closesAt) revert FM_LaneClosed(laneId);
+
+        uint32 streak = FamoLaneMath.clampStreak(_streak[laneId][msg.sender], STREAK_CAP);
+        _streak[laneId][msg.sender] = streak;
+
+        _lastPulse[laneId][msg.sender] = PulseRecord({
+            moodHash: moodHash,
+            intentHash: intentHash,
+            replyTo: replyTo,
+            emittedAt: uint64(block.timestamp),
+            streakAfter: streak
+        });
+
+        FrenCard storage card = _cards[laneId][msg.sender];
+        unchecked {
+            card.pulseTotal += 1;
+            lane.pulseCount += 1;
+            globalPulseCount += 1;
+        }
+
+        card.auraBlend = FamoLaneMath.blendAura(card.auraBlend, moodHash, streak);
+
+        if (tipWei > 0) {
+            lane.tipPool += tipWei;
+            globalTipWei += tipWei;
+            emit TipReceived(laneId, msg.sender, tipWei, lane.tipPool);
+        }
+
+        emit Pulled(laneId, msg.sender, moodHash, intentHash, streak);
+    }
+
+    function storeCapsule(
+        uint64 laneId,
+        bytes32 adviceHash,
+        bytes32 moodHash,
+        bytes calldata signature
+    ) external payable whenLanesLive {
+        if (msg.value < CAPSULE_FEE_WEI) revert FM_CapsuleFeeShort(msg.value, CAPSULE_FEE_WEI);
+        if (adviceHash == bytes32(0)) revert FM_IntentZero();
+        if (_usedCapsuleHash[adviceHash]) revert FM_CapsuleReplay(adviceHash);
+
+        Lane storage lane = _lanes[laneId];
+        if (lane.openedAt == 0) revert FM_LaneUnknown(laneId);
+        if (!lane.open || lane.sealed) revert FM_LaneClosed(laneId);
+
+        uint64 nonce = _capsuleNonce[laneId][msg.sender];
+        bytes32 digest = _capsuleDigest(laneId, msg.sender, adviceHash, moodHash, nonce);
+        _verifyAuthorSignature(msg.sender, digest, signature);
+
+        unchecked {
+            _capsuleNonce[laneId][msg.sender] = nonce + 1;
+            capsuleSeq += 1;
+        }
+
+        _usedCapsuleHash[adviceHash] = true;
+        _capsules[capsuleSeq] = Capsule({
+            adviceHash: adviceHash,
+            moodHash: moodHash,
+            author: msg.sender,
+            laneId: laneId,
+            storedAt: uint64(block.timestamp),
+            revoked: false
+        });
+
+        lane.tipPool += msg.value;
