@@ -828,3 +828,86 @@ contract FamoSynapseAlley {
 
     function batchCapsuleMoodHashes(uint256[] calldata capsuleIds) external view returns (bytes32[] memory moods) {
         if (capsuleIds.length > MAX_BATCH) revert FM_BatchTooLarge(capsuleIds.length, MAX_BATCH);
+        moods = new bytes32[](capsuleIds.length);
+        for (uint256 i = 0; i < capsuleIds.length; ++i) {
+            Capsule memory cap = _capsules[capsuleIds[i]];
+            if (cap.storedAt != 0) {
+                moods[i] = cap.moodHash;
+            }
+        }
+    }
+
+    function batchGuildActiveFlags(uint32[] calldata guildIds) external view returns (bool[] memory flags) {
+        if (guildIds.length > MAX_BATCH) revert FM_BatchTooLarge(guildIds.length, MAX_BATCH);
+        flags = new bool[](guildIds.length);
+        for (uint256 i = 0; i < guildIds.length; ++i) {
+            flags[i] = _guilds[guildIds[i]].active;
+        }
+    }
+
+    function batchGuildFounders(uint32[] calldata guildIds) external view returns (address[] memory founders) {
+        if (guildIds.length > MAX_BATCH) revert FM_BatchTooLarge(guildIds.length, MAX_BATCH);
+        founders = new address[](guildIds.length);
+        for (uint256 i = 0; i < guildIds.length; ++i) {
+            founders[i] = _guilds[guildIds[i]].founder;
+        }
+    }
+
+    function batchGuildCrestHashes(uint32[] calldata guildIds) external view returns (bytes32[] memory crests) {
+        if (guildIds.length > MAX_BATCH) revert FM_BatchTooLarge(guildIds.length, MAX_BATCH);
+        crests = new bytes32[](guildIds.length);
+        for (uint256 i = 0; i < guildIds.length; ++i) {
+            crests[i] = _guilds[guildIds[i]].crestHash;
+        }
+    }
+
+    function batchLaneCloseTimes(uint64[] calldata laneIds) external view returns (uint64[] memory closesAt) {
+        if (laneIds.length > MAX_BATCH) revert FM_BatchTooLarge(laneIds.length, MAX_BATCH);
+        closesAt = new uint64[](laneIds.length);
+        for (uint256 i = 0; i < laneIds.length; ++i) {
+            closesAt[i] = _lanes[laneIds[i]].closesAt;
+        }
+    }
+
+    function batchLaneOpenTimes(uint64[] calldata laneIds) external view returns (uint64[] memory openedAt) {
+        if (laneIds.length > MAX_BATCH) revert FM_BatchTooLarge(laneIds.length, MAX_BATCH);
+        openedAt = new uint64[](laneIds.length);
+        for (uint256 i = 0; i < laneIds.length; ++i) {
+            openedAt[i] = _lanes[laneIds[i]].openedAt;
+        }
+    }
+
+    function batchAvatarHashes(uint64 laneId, address[] calldata frens) external view returns (bytes32[] memory avatars) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        avatars = new bytes32[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            if (_registered[laneId][frens[i]]) {
+                avatars[i] = _cards[laneId][frens[i]].avatarHash;
+            }
+        }
+    }
+
+    function batchCapsuleAdviceHashes(uint256[] calldata capsuleIds) external view returns (bytes32[] memory advice) {
+        if (capsuleIds.length > MAX_BATCH) revert FM_BatchTooLarge(capsuleIds.length, MAX_BATCH);
+        advice = new bytes32[](capsuleIds.length);
+        for (uint256 i = 0; i < capsuleIds.length; ++i) {
+            Capsule memory cap = _capsules[capsuleIds[i]];
+            if (cap.storedAt != 0) {
+                advice[i] = cap.adviceHash;
+            }
+        }
+    }
+
+    function batchLaneCuratorNotes(uint64[] calldata laneIds) external view returns (bytes32[] memory notes) {
+        if (laneIds.length > MAX_BATCH) revert FM_BatchTooLarge(laneIds.length, MAX_BATCH);
+        notes = new bytes32[](laneIds.length);
+        for (uint256 i = 0; i < laneIds.length; ++i) {
+            notes[i] = _lanes[laneIds[i]].curatorNote;
+        }
+    }
+
+    function batchReplyToHashes(uint64 laneId, address[] calldata frens) external view returns (bytes32[] memory replies) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        replies = new bytes32[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            if (_registered[laneId][frens[i]]) {
