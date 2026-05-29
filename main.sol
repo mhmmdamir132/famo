@@ -994,3 +994,77 @@ contract FamoSynapseAlley {
         );
     }
 
+    function capsuleDigest(
+        uint64 laneId,
+        address author,
+        bytes32 adviceHash,
+        bytes32 moodHash,
+        uint64 nonce
+    ) external view returns (bytes32) {
+        return _capsuleDigest(laneId, author, adviceHash, moodHash, nonce);
+    }
+
+    function _capsuleDigest(
+        uint64 laneId,
+        address author,
+        bytes32 adviceHash,
+        bytes32 moodHash,
+        uint64 nonce
+    ) private view returns (bytes32) {
+        bytes32 structHash = keccak256(abi.encode(FM_CAPSULE_TYPEHASH, laneId, author, adviceHash, moodHash, nonce));
+        return keccak256(abi.encodePacked("\x19\x01", _domainSeparator(), structHash));
+    }
+
+    function _verifyAuthorSignature(address author, bytes32 digest, bytes calldata signature) private view {
+        if (author.code.length > 0) {
+            try IERC1271(author).isValidSignature(digest, signature) returns (bytes4 magic) {
+                if (magic != _ERC1271_MAGIC) revert FM_CapsuleBadSig(author, author);
+            } catch {
+                revert FM_CapsuleBadSig(author, author);
+            }
+            return;
+        }
+
+        address recovered = FamoECDSA.recover(digest, signature);
+        if (recovered != author) revert FM_CapsuleBadSig(author, recovered);
+    }
+
+    function _badgeThreshold(uint8 badgeId) private pure returns (uint32) {
+        if (badgeId == 0) return 1;
+        if (badgeId == 1) return 5;
+        if (badgeId == 2) return 12;
+        if (badgeId == 3) return 24;
+        if (badgeId == 4) return 48;
+        if (badgeId == 5) return 96;
+        return uint32(144 + uint256(badgeId) * 11);
+    }
+
+    function _removeFromRoster(uint32 guildId, address member) private {
+        address[] storage roster = _guildRoster[guildId];
+        uint256 len = roster.length;
+        for (uint256 i = 0; i < len; ++i) {
+            if (roster[i] == member) {
+                roster[i] = roster[len - 1];
+                roster.pop();
+                break;
+            }
+        }
+    }
+
+    function _removeFromMemberGuilds(address member, uint32 guildId) private {
+        uint32[] storage list = _guildsOf[member];
+        uint256 len = list.length;
+        for (uint256 i = 0; i < len; ++i) {
+            if (list[i] == guildId) {
+                list[i] = list[len - 1];
+                list.pop();
+                break;
+            }
+        }
+    }
+
+    function _sendWei(address payable to, uint256 amountWei) private {
+        (bool ok, ) = to.call{value: amountWei}("");
+        if (!ok) revert FM_TransferFailed();
+    }
+}
