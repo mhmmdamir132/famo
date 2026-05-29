@@ -81,3 +81,86 @@ contract FamoSynapseAlley {
     bytes4 private constant _ERC1271_MAGIC = 0x1626ba7e;
 
     struct Lane {
+        bytes32 themeHash;
+        bytes32 curatorNote;
+        bool open;
+        bool sealed;
+        uint64 openedAt;
+        uint64 closesAt;
+        uint32 pulseCount;
+        uint32 frenCount;
+        uint256 tipPool;
+    }
+
+    struct FrenCard {
+        bytes32 avatarHash;
+        bytes32 personaTag;
+        bytes32 auraBlend;
+        bool active;
+        uint64 registeredAt;
+        uint32 pulseTotal;
+        uint32 badgeMask;
+    }
+
+    struct PulseRecord {
+        bytes32 moodHash;
+        bytes32 intentHash;
+        bytes32 replyTo;
+        uint64 emittedAt;
+        uint32 streakAfter;
+    }
+
+    struct Guild {
+        bytes32 crestHash;
+        address founder;
+        bool active;
+        uint32 memberCount;
+        uint64 forgedAt;
+    }
+
+    struct Capsule {
+        bytes32 adviceHash;
+        bytes32 moodHash;
+        address author;
+        uint64 laneId;
+        uint64 storedAt;
+        bool revoked;
+    }
+
+    address public warden;
+    bool public lanePaused;
+
+    uint64 public genesisNonce;
+    uint64 public deployChainId;
+    uint64 public lastLaneId;
+    uint256 public globalPulseCount;
+    uint256 public globalTipWei;
+    uint256 public capsuleSeq;
+
+    mapping(uint64 => Lane) private _lanes;
+    mapping(uint64 => mapping(address => FrenCard)) private _cards;
+    mapping(uint64 => mapping(address => bool)) private _registered;
+    mapping(uint64 => mapping(address => PulseRecord)) private _lastPulse;
+    mapping(uint64 => mapping(address => uint32)) private _streak;
+    mapping(uint64 => mapping(address => uint64)) private _capsuleNonce;
+    mapping(uint256 => Capsule) private _capsules;
+    mapping(uint32 => Guild) private _guilds;
+    mapping(uint32 => mapping(address => bool)) private _guildMember;
+    mapping(uint32 => address[]) private _guildRoster;
+    mapping(address => uint32[]) private _guildsOf;
+    mapping(bytes32 => bool) private _usedCapsuleHash;
+
+    uint256 private _withdrawLock = 1;
+
+    error FM_NotWarden(address caller);
+    error FM_LanePaused();
+    error FM_LaneUnknown(uint64 laneId);
+    error FM_LaneAlreadyOpen(uint64 laneId);
+    error FM_LaneClosed(uint64 laneId);
+    error FM_LaneSealed(uint64 laneId);
+    error FM_LaneIdOutOfRange(uint64 laneId);
+    error FM_ThemeZero();
+    error FM_AvatarZero();
+    error FM_PersonaZero();
+    error FM_MoodZero();
+    error FM_IntentZero();
