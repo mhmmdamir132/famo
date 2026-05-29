@@ -662,3 +662,86 @@ contract FamoSynapseAlley {
         return keccak256(abi.encodePacked(hA, hB, FM_BUILD_TAG, FM_BUILD_STAMP, ADDRESS_A, ADDRESS_B, ADDRESS_C));
     }
 
+    function batchLanePulseTotals(uint64[] calldata laneIds) external view returns (uint32[] memory totals) {
+        if (laneIds.length > MAX_BATCH) revert FM_BatchTooLarge(laneIds.length, MAX_BATCH);
+        totals = new uint32[](laneIds.length);
+        for (uint256 i = 0; i < laneIds.length; ++i) {
+            Lane memory lane = _lanes[laneIds[i]];
+            totals[i] = lane.pulseCount;
+        }
+    }
+
+    function batchFrenPulseTotals(uint64 laneId, address[] calldata frens) external view returns (uint32[] memory totals) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        totals = new uint32[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            if (_registered[laneId][frens[i]]) {
+                totals[i] = _cards[laneId][frens[i]].pulseTotal;
+            }
+        }
+    }
+
+    function batchLaneOpenFlags(uint64[] calldata laneIds) external view returns (bool[] memory flags) {
+        if (laneIds.length > MAX_BATCH) revert FM_BatchTooLarge(laneIds.length, MAX_BATCH);
+        flags = new bool[](laneIds.length);
+        for (uint256 i = 0; i < laneIds.length; ++i) {
+            Lane memory lane = _lanes[laneIds[i]];
+            flags[i] = lane.openedAt != 0 && lane.open && !lane.sealed && block.timestamp <= lane.closesAt;
+        }
+    }
+
+    function batchBadgeMasks(uint64 laneId, address[] calldata frens) external view returns (uint32[] memory masks) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        masks = new uint32[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            if (_registered[laneId][frens[i]]) {
+                masks[i] = _cards[laneId][frens[i]].badgeMask;
+            }
+        }
+    }
+
+    function batchCapsuleAuthors(uint256[] calldata capsuleIds) external view returns (address[] memory authors) {
+        if (capsuleIds.length > MAX_BATCH) revert FM_BatchTooLarge(capsuleIds.length, MAX_BATCH);
+        authors = new address[](capsuleIds.length);
+        for (uint256 i = 0; i < capsuleIds.length; ++i) {
+            Capsule memory cap = _capsules[capsuleIds[i]];
+            if (cap.storedAt != 0) {
+                authors[i] = cap.author;
+            }
+        }
+    }
+
+    function batchGuildMemberCounts(uint32[] calldata guildIds) external view returns (uint32[] memory counts) {
+        if (guildIds.length > MAX_BATCH) revert FM_BatchTooLarge(guildIds.length, MAX_BATCH);
+        counts = new uint32[](guildIds.length);
+        for (uint256 i = 0; i < guildIds.length; ++i) {
+            Guild memory g = _guilds[guildIds[i]];
+            counts[i] = g.memberCount;
+        }
+    }
+
+    function batchAuraBlends(uint64 laneId, address[] calldata frens) external view returns (bytes32[] memory blends) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        blends = new bytes32[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            if (_registered[laneId][frens[i]]) {
+                blends[i] = _cards[laneId][frens[i]].auraBlend;
+            }
+        }
+    }
+
+    function batchStreaks(uint64 laneId, address[] calldata frens) external view returns (uint32[] memory streaks) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        streaks = new uint32[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            streaks[i] = _streak[laneId][frens[i]];
+        }
+    }
+
+    function batchLaneTipPools(uint64[] calldata laneIds) external view returns (uint256[] memory pools) {
+        if (laneIds.length > MAX_BATCH) revert FM_BatchTooLarge(laneIds.length, MAX_BATCH);
+        pools = new uint256[](laneIds.length);
+        for (uint256 i = 0; i < laneIds.length; ++i) {
+            pools[i] = _lanes[laneIds[i]].tipPool;
+        }
+    }
