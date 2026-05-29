@@ -745,3 +745,86 @@ contract FamoSynapseAlley {
             pools[i] = _lanes[laneIds[i]].tipPool;
         }
     }
+
+    function batchRegisteredFlags(uint64 laneId, address[] calldata accounts) external view returns (bool[] memory flags) {
+        if (accounts.length > MAX_BATCH) revert FM_BatchTooLarge(accounts.length, MAX_BATCH);
+        flags = new bool[](accounts.length);
+        for (uint256 i = 0; i < accounts.length; ++i) {
+            flags[i] = _registered[laneId][accounts[i]];
+        }
+    }
+
+    function batchGuildMembership(uint32 guildId, address[] calldata accounts) external view returns (bool[] memory flags) {
+        if (accounts.length > MAX_BATCH) revert FM_BatchTooLarge(accounts.length, MAX_BATCH);
+        flags = new bool[](accounts.length);
+        for (uint256 i = 0; i < accounts.length; ++i) {
+            flags[i] = _guildMember[guildId][accounts[i]];
+        }
+    }
+
+    function batchCapsuleRevokedFlags(uint256[] calldata capsuleIds) external view returns (bool[] memory flags) {
+        if (capsuleIds.length > MAX_BATCH) revert FM_BatchTooLarge(capsuleIds.length, MAX_BATCH);
+        flags = new bool[](capsuleIds.length);
+        for (uint256 i = 0; i < capsuleIds.length; ++i) {
+            Capsule memory cap = _capsules[capsuleIds[i]];
+            flags[i] = cap.storedAt != 0 && cap.revoked;
+        }
+    }
+
+    function batchLaneThemeHashes(uint64[] calldata laneIds) external view returns (bytes32[] memory themes) {
+        if (laneIds.length > MAX_BATCH) revert FM_BatchTooLarge(laneIds.length, MAX_BATCH);
+        themes = new bytes32[](laneIds.length);
+        for (uint256 i = 0; i < laneIds.length; ++i) {
+            themes[i] = _lanes[laneIds[i]].themeHash;
+        }
+    }
+
+    function batchPersonaTags(uint64 laneId, address[] calldata frens) external view returns (bytes32[] memory tags) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        tags = new bytes32[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            if (_registered[laneId][frens[i]]) {
+                tags[i] = _cards[laneId][frens[i]].personaTag;
+            }
+        }
+    }
+
+    function batchLastPulseTimes(uint64 laneId, address[] calldata frens) external view returns (uint64[] memory times) {
+        if (frens.length > MAX_BATCH) revert FM_BatchTooLarge(frens.length, MAX_BATCH);
+        times = new uint64[](frens.length);
+        for (uint256 i = 0; i < frens.length; ++i) {
+            if (_registered[laneId][frens[i]]) {
+                times[i] = _lastPulse[laneId][frens[i]].emittedAt;
+            }
+        }
+    }
+
+    function batchLaneSealedFlags(uint64[] calldata laneIds) external view returns (bool[] memory flags) {
+        if (laneIds.length > MAX_BATCH) revert FM_BatchTooLarge(laneIds.length, MAX_BATCH);
+        flags = new bool[](laneIds.length);
+        for (uint256 i = 0; i < laneIds.length; ++i) {
+            flags[i] = _lanes[laneIds[i]].sealed;
+        }
+    }
+
+    function batchLaneFrenCounts(uint64[] calldata laneIds) external view returns (uint32[] memory counts) {
+        if (laneIds.length > MAX_BATCH) revert FM_BatchTooLarge(laneIds.length, MAX_BATCH);
+        counts = new uint32[](laneIds.length);
+        for (uint256 i = 0; i < laneIds.length; ++i) {
+            counts[i] = _lanes[laneIds[i]].frenCount;
+        }
+    }
+
+    function batchCapsuleLaneIds(uint256[] calldata capsuleIds) external view returns (uint64[] memory laneIdsOut) {
+        if (capsuleIds.length > MAX_BATCH) revert FM_BatchTooLarge(capsuleIds.length, MAX_BATCH);
+        laneIdsOut = new uint64[](capsuleIds.length);
+        for (uint256 i = 0; i < capsuleIds.length; ++i) {
+            Capsule memory cap = _capsules[capsuleIds[i]];
+            if (cap.storedAt != 0) {
+                laneIdsOut[i] = cap.laneId;
+            }
+        }
+    }
+
+    function batchCapsuleMoodHashes(uint256[] calldata capsuleIds) external view returns (bytes32[] memory moods) {
+        if (capsuleIds.length > MAX_BATCH) revert FM_BatchTooLarge(capsuleIds.length, MAX_BATCH);
